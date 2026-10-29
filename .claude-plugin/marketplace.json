@@ -1,0 +1,5 @@
+{
+  "name": "mission-control",
+  "owner": { "name": "sjconsidine" },
+  "plugins": [{ "name": "mission-control", "source": "./", "description": "Progress bar with pixel crabs, a live Agents pane and an All chats dashboard for Claude Code" }]
+}

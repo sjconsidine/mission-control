@@ -1,0 +1,6 @@
+{
+  "name": "mission-control",
+  "version": "0.8.1",
+  "description": "Progress bar above the prompt, a live helper-agents pane, and an All chats pane showing what every chat is doing",
+  "types": "./types/index.d.ts"
+}
