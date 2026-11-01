@@ -384,12 +384,12 @@ const applyPlanCall = (steps: Step[], args: Record<string, unknown>): Step[] => 
   return next
 }
 
-const STATUS_ORDER: Array<{ status: Card['status'] | 'silent'; label: string; color: string }> = [
-  { status: 'waiting', label: 'Waiting on you', color: 'warning' },
-  { status: 'running', label: 'Running', color: 'suggestion' },
-  { status: 'silent', label: 'No signal (closed or stuck?)', color: 'error' },
-  { status: 'finished', label: 'Finished', color: 'success' },
-  { status: 'idle', label: 'Open, nothing running', color: 'inactive' },
+const STATUS_ORDER: Array<{ status: Card['status'] | 'silent'; label: string; color: string; emoji: string }> = [
+  { status: 'waiting', label: 'Waiting on you', color: 'warning', emoji: '🟠' },
+  { status: 'running', label: 'Running', color: 'suggestion', emoji: '🔵' },
+  { status: 'silent', label: 'No signal (closed or stuck?)', color: 'error', emoji: '🔴' },
+  { status: 'finished', label: 'Finished', color: 'success', emoji: '✅' },
+  { status: 'idle', label: 'Open, nothing running', color: 'inactive', emoji: '⚪' },
 ]
 
 // Set at session.start; a reload runs it again.
@@ -400,7 +400,7 @@ let home = ''
 
 // What the mod can tell about itself, written beside the status files so a
 // problem can be read from outside the app.
-const VERSION = '0.8.1'
+const VERSION = '0.9.2'
 const diag = { bandDraws: 0, bandError: '', titles: 0, titlesError: '' }
 
 // Each chat writes one small file; the All chats pane reads them all.
@@ -1021,9 +1021,6 @@ export const register: Register = on => {
         <Button key="chats" plain onPress={() => void $.ui.open({ id: CHATS_PANE, title: 'All chats' })}>
           All chats
         </Button>
-        <Button key="mods" plain onPress={() => void $.ui.open({ id: MODS_PANE, title: 'Mods' })}>
-          Mods
-        </Button>
         <Button key="hide" plain role="dismiss" label="✕" onPress={() => update($, isBandHidden, () => true)} />
       </Box>
       {below}
@@ -1211,6 +1208,11 @@ export const register: Register = on => {
       card => card.status !== 'closed' && !(card.status !== 'running' && at - card.updatedAt > HIDE_AFTER),
     )
     const room = Math.max(20, e.props.bodyColumns - 4)
+    // One running number across groups, in the order chats are drawn.
+    const ordered = STATUS_ORDER.flatMap(group =>
+      shown.filter(card => groupOf(card) === group.status).sort((a, b) => b.updatedAt - a.updatedAt),
+    )
+    const numberOf = new Map(ordered.map((card, i) => [card.id, i + 1]))
 
     return (
       <Box flexDirection="column" gap={1}>
@@ -1227,10 +1229,10 @@ export const register: Register = on => {
           if (inGroup.length === 0) return null
 
           return (
-            <Box flexDirection="column">
+            <Box flexDirection="column" gap={1}>
               <Box flexDirection="row" gap={2}>
                 <Text color={group.color} weight="bold">
-                  {group.label} ({inGroup.length})
+                  {group.emoji} {group.label} ({inGroup.length})
                 </Text>
                 {(group.status === 'finished' || group.status === 'idle' || group.status === 'silent') && (
                   <Button key={`clear-all-${group.status}`} plain label="Clear all" onPress={() => clearCards($, inGroup)} />
@@ -1239,13 +1241,16 @@ export const register: Register = on => {
               {inGroup.map(card => (
                 <Box flexDirection="column" paddingLeft={2}>
                   <Box flexDirection="row" gap={1}>
+                    <Text color={group.color} weight="bold">
+                      {numberOf.get(card.id)}.
+                    </Text>
                     {names[card.id]?.localId && card.id !== sessionId ? (
                       <Button key={`open-${card.id}`} plain onPress={() => openChat($, names[card.id]?.localId ?? '')}>
-                        {short(card.title, room - 8)}
+                        {short(card.title, room - 11)}
                       </Button>
                     ) : (
                       <Text weight={card.id === sessionId ? 'bold' : 'regular'}>
-                        {short(card.title, room - 8)}
+                        {short(card.title, room - 11)}
                         {card.id === sessionId ? ' (this chat)' : ''}
                       </Text>
                     )}
@@ -1254,7 +1259,7 @@ export const register: Register = on => {
                     )}
                   </Box>
                   <Text dimColor>
-                    {card.folder} · {when(card, groupOf(card), at)}
+                    {'    '}{card.folder} · {when(card, groupOf(card), at)}
                     {card.helpersRunning > 0 ? ` · ${card.helpersRunning} helpers` : ''}
                   </Text>
                   {card.total > 0 && card.status === 'running' && (

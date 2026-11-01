@@ -4,7 +4,7 @@ A Claude Code mod that shows what Claude is doing, in this chat and every other 
 
 - **Progress bar above the prompt:** the chat's task list as a sparkly bar with a "Tasks 2/4" pill, and a pixel crab whose hat shows the effort level.
 - **Agents pane** (`/helpers`): every helper agent with its job, model, effort, tokens, rough cost and time. Crabs wear a hat for their job: researcher, writer, designer, video editor, builder, analyst, reviewer and more.
-- **All chats pane** (`/chats`): every open chat grouped into Waiting on you, Running, No signal and Finished. Click a chat's name to open it; clear finished ones with ✕ or Clear all.
+- **All chats pane** (`/chats`): every open chat, numbered, grouped into 🟠 Waiting on you, 🔵 Running, 🔴 No signal, ✅ Finished and ⚪ Open. Click a chat's name to open it; clear finished ones with ✕ or Clear all.
 - **Background jobs:** a chat that leaves a render or encode running stays under Running until it finishes.
 
 Costs are rough API-price estimates, a yardstick only. The All chats pane reads chat names from the Claude desktop app on macOS; elsewhere it uses each chat's first message.
