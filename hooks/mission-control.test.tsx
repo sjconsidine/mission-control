@@ -246,6 +246,63 @@ test('a background job keeps the chat Running until its notice arrives', async (
   await ui.unmount()
 })
 
+test('a job that ends never closes a different one', async ($, on) => {
+  const written: Record<string, string> = {}
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+  on('env.get', () => ({ value: '/home/me' }))
+  on('session.id', () => ({ value: 'this' }))
+  on('clock.now', () => ({ value: Date.now() }))
+  on('clock.every', () => ({ value: undefined }))
+  on('command.register', () => ({ value: { command: 'x' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('fs.write', (_, e) => {
+    written[e.path] = String(e.text)
+    return { value: undefined }
+  })
+  on('fs.list', () => ({ value: [] }))
+  on('fs.read', () => ({ deny: 'missing' }))
+  on('process.run', () => ({ value: { stdout: '{}', stderr: '', exitCode: 0, isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.messages', () => ({ value: [] }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }) as never)
+  on('turn.complete', (_, e) => ({ text: e.answer }) as never)
+  on('prompt.submit', (_, e) => ({ text: e.text }))
+  let next = 0
+  const results = [
+    { result: { stdout: 'Command did not complete within its 120s timeout and was moved to the background (ID: btest1).' } },
+    { result: { stdout: '', backgroundTaskId: 'bbuild' } },
+  ]
+  on('tool.call', () => results[next++] as never)
+  await $.session.start({ cwd: '/home/me', surface: 'desktop', isInteractive: false })
+
+  const card = () => JSON.parse(written['/home/me/.claude/mission-control/sessions/this.json'] ?? '{}')
+  await $.turn.start({ text: 'build it', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'python3 test.py', description: 'Test the ending' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'python3 build.py', description: 'Build v10', run_in_background: true } as never)
+  await $.turn.complete({ answer: 'Building.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'completed' } as never)
+
+  // The moved-to-background test ends first: the build must stay.
+  await $.prompt.submit({ text: '<task-notification><task-id>btest1</task-id> completed', origin: { kind: 'task-notification' }, wait: false })
+  await $.turn.start({ text: '', turnId: 't2' } as never)
+  await $.turn.complete({ answer: 'Test passed.', durationMs: 1, isAborted: false, turnId: 't2', reason: 'completed' } as never)
+  expect(card().status).toBe('running')
+  expect(card().note).toContain('Build v10')
+
+  // A note for a job we never saw ends nothing either.
+  await $.prompt.submit({ text: '<task-notification><task-id>bother</task-id> completed', origin: { kind: 'task-notification' }, wait: false })
+  await $.turn.start({ text: '', turnId: 't3' } as never)
+  await $.turn.complete({ answer: 'Still building.', durationMs: 1, isAborted: false, turnId: 't3', reason: 'completed' } as never)
+  expect(card().status).toBe('running')
+
+  await $.prompt.submit({ text: '<task-notification><task-id>bbuild</task-id> completed', origin: { kind: 'task-notification' }, wait: false })
+  await $.turn.start({ text: '', turnId: 't4' } as never)
+  await $.turn.complete({ answer: 'Built.', durationMs: 1, isAborted: false, turnId: 't4', reason: 'completed' } as never)
+  expect(card().status).toBe('finished')
+})
+
 test('a finished chat can be cleared from All chats', async ($, on) => {
   const files: Record<string, string> = {}
   let other = { ...OTHER_CHAT, status: 'finished', note: 'Thumbnail done', updatedAt: Date.now() }

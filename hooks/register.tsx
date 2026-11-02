@@ -400,7 +400,7 @@ let home = ''
 
 // What the mod can tell about itself, written beside the status files so a
 // problem can be read from outside the app.
-const VERSION = '0.9.2'
+const VERSION = '0.9.4'
 const diag = { bandDraws: 0, bandError: '', titles: 0, titlesError: '' }
 
 // Each chat writes one small file; the All chats pane reads them all.
@@ -727,11 +727,10 @@ export const register: Register = on => {
     const title = state.title === '' && !e.isMeta ? short(e.text, 70) : state.title
     if (title !== state.title) await update($, live, value => ({ ...value, title }))
     if (e.origin?.kind === 'task-notification') {
-      // The note names the job's id; if it doesn't, the oldest job is the one that ended.
-      await update($, jobs, list => {
-        const left = list.filter(j => !e.text.includes(j.id))
-        return left.length < list.length ? left : list.slice(1)
-      })
+      // The note names the job's id. A note for a job we never saw ends nothing;
+      // only a note with no id at all is taken to be the oldest job.
+      const named = /<task-id>([^<]+)<\/task-id>/.exec(e.text)?.[1]
+      await update($, jobs, list => (named !== undefined ? list.filter(j => j.id !== named) : list.slice(1)))
       await writeCard($)
     }
 
@@ -810,8 +809,11 @@ export const register: Register = on => {
     const result = await next(e)
     await setLive($, { tool: '', toolSince: 0 })
 
-    const taskId = (result as { result?: { backgroundTaskId?: unknown } }).result?.backgroundTaskId
-    if (name === 'Bash' && args.run_in_background === true && typeof taskId === 'string') {
+    // Started in the background, or moved there after running past its timeout.
+    const given = (result as { result?: { backgroundTaskId?: unknown } }).result?.backgroundTaskId
+    const taskId =
+      typeof given === 'string' ? given : /\(ID: (\w+)\)|with ID: (\w+)/.exec(JSON.stringify(result ?? ''))?.slice(1).find(Boolean)
+    if (name === 'Bash' && typeof taskId === 'string') {
       const what = typeof args.description === 'string' && args.description !== '' ? args.description : 'Background command'
       const at = await $.clock.now()
       await update($, jobs, list => [...list.filter(j => j.id !== taskId), { id: taskId, label: what, startedAt: at }])
